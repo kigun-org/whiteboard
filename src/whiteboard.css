@@ -1,0 +1,16 @@
+whiteboard-editor {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 36rem;
+  overflow: hidden;
+}
+
+whiteboard-editor [data-whiteboard-root],
+whiteboard-editor .whiteboard-status {
+  height: 100%;
+}
+
+whiteboard-editor .excalidraw {
+  height: 100%;
+}
