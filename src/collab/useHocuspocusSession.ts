@@ -88,6 +88,8 @@ export function useHocuspocusSession(
     const provider = new HocuspocusProvider({
       websocketProvider: socketFor(url),
       name: roomId,
+      // View replacement can briefly overlap providers for the same room.
+      sessionAwareness: true,
       document: doc,
       token: async () =>
         JSON.stringify({ token: await fetchToken(tokenUrl), generation }),

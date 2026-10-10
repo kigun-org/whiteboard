@@ -51,11 +51,12 @@ export function elementsFromMap(map: Y.Map<SceneElement>) {
   return elements;
 }
 
-export function bindScene(doc: Y.Doc, api: SceneApi) {
+export function bindScene(doc: Y.Doc, api: SceneApi, { writable = true } = {}) {
   const map = doc.getMap<SceneElement>("elements");
   let applying = false;
 
   function write(elements: readonly SceneElement[]) {
+    if (!writable) return;
     doc.transact(() => {
       for (const element of elements) {
         if (!element?.id) continue;

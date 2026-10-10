@@ -115,16 +115,20 @@ function Board({
   }, [session]);
 
   useEffect(() => {
-    if (!apiReady || !session || viewMode || !host.api) return;
+    if (!apiReady || !session || !host.api) return;
     if (boundDoc.current === session.doc) return;
     binding.current?.destroy();
     binding.current = null;
     const api = host.api;
-    binding.current = bindScene(session.doc, {
-      updateScene: (scene) => api.updateScene(scene as never),
-      getSceneElementsIncludingDeleted: () =>
-        api.getSceneElementsIncludingDeleted() as unknown as SceneElement[],
-    });
+    binding.current = bindScene(
+      session.doc,
+      {
+        updateScene: (scene) => api.updateScene(scene as never),
+        getSceneElementsIncludingDeleted: () =>
+          api.getSceneElementsIncludingDeleted() as unknown as SceneElement[],
+      },
+      { writable: !viewMode },
+    );
     boundDoc.current = session.doc;
     return () => {
       binding.current?.destroy();
