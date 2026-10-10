@@ -74,7 +74,7 @@ export function useHocuspocusSession(
 
   useEffect(() => {
     if (!roomId || !url || !tokenUrl) {
-      setState({ status: "ready", session: null, writable: false });
+      setState({ status: "ready", session: null, writable: true });
       return;
     }
 

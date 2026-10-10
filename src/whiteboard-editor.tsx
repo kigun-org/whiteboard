@@ -88,6 +88,7 @@ function Board({
   const binding = useRef<ReturnType<typeof bindScene> | null>(null);
   const boundDoc = useRef<object | null>(null);
   const [apiReady, setApiReady] = useState(false);
+  const lastScene = useRef<string | null>(null);
 
   const session = sessionState.status === "ready" ? sessionState.session : null;
   const serverWritable = sessionState.status === "ready" ? sessionState.writable : true;
@@ -152,6 +153,7 @@ function Board({
         viewModeEnabled={viewMode}
         isCollaborating={Boolean(session)}
         UIOptions={UI_OPTIONS}
+        validateEmbeddable={false}
         excalidrawAPI={(next: ExcalidrawImperativeAPI) => {
           host.api = next;
           setApiReady(true);
@@ -159,6 +161,15 @@ function Board({
         onChange={(next, appState) => {
           if (!viewMode) {
             binding.current?.onChange(next as unknown as SceneElement[]);
+          }
+          if (!live) {
+            const scene = JSON.stringify({ elements: next });
+            const changed = lastScene.current !== null && lastScene.current !== scene;
+            lastScene.current = scene;
+            host.sceneInput.value = scene;
+            if (changed && !viewMode) {
+              host.dispatchEvent(new Event("input", { bubbles: true }));
+            }
           }
           if (!session || viewMode) return;
           session.provider.setAwarenessField(
@@ -178,6 +189,16 @@ function Board({
 
 class WhiteboardEditorElement extends HTMLElement {
   api: ExcalidrawImperativeAPI | null = null;
+  get sceneInput(): HTMLInputElement {
+    let input = this.querySelector<HTMLInputElement>(':scope > input[type="hidden"]');
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.value = JSON.stringify({ elements: readScene(this) });
+      this.append(input);
+    }
+    return input;
+  }
   private root: Root | null = null;
   private mountPoint: HTMLElement | null = null;
 

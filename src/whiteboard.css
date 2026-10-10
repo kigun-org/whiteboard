@@ -14,3 +14,15 @@ whiteboard-editor .whiteboard-status {
 whiteboard-editor .excalidraw {
   height: 100%;
 }
+
+/* Excalidraw mounts only open menus. Tabler's shared class hides them. */
+whiteboard-editor .excalidraw .dropdown-menu {
+  display: block;
+}
+
+/* This Excalidraw version has no option to hide Web Embed. The Mermaid
+   action reuses its test ID, so target only the item after Frame. */
+whiteboard-editor .App-toolbar__extra-tools-dropdown
+  [data-testid="toolbar-frame"] + [data-testid="toolbar-embeddable"] {
+  display: none;
+}
