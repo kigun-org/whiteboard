@@ -16,6 +16,11 @@ whiteboard-editor .excalidraw {
   height: 100%;
 }
 
+/* Remove the canvas menu in both view and edit modes, including mobile. */
+whiteboard-editor .excalidraw .main-menu-trigger {
+  display: none;
+}
+
 /* Excalidraw mounts only open menus. Tabler's shared class hides them. */
 whiteboard-editor .excalidraw .dropdown-menu {
   display: block;

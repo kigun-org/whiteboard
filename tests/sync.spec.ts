@@ -46,6 +46,8 @@ test("two pages draw on one board", async ({ browser }) => {
   await right.waitForFunction(
     () => document.querySelector("whiteboard-editor")?.api,
   );
+  await expect(left.getByTestId("toolbar-rectangle")).toBeVisible();
+  await expect(right.getByTestId("toolbar-rectangle")).toBeVisible();
 
   await left.evaluate((element) => {
     const board = document.querySelector("whiteboard-editor");
@@ -89,6 +91,7 @@ test("an in-place edit of a received shape reaches the other page", async ({
     await page.waitForFunction(
       () => document.querySelector("whiteboard-editor")?.api,
     );
+    await expect(page.getByTestId("toolbar-rectangle")).toBeVisible();
   }
 
   await left.evaluate((element) => {
@@ -134,3 +137,60 @@ test("an in-place edit of a received shape reaches the other page", async ({
 
   await context.close();
 });
+
+test("live startup waits for sync and discards stale fallback shapes", async ({ page }) => {
+  let release!: () => void;
+  const tokenReady = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("http://127.0.0.1:14123/token", async (route) => {
+    await tokenReady;
+    await route.fulfill({
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ token: "test" }),
+    });
+  });
+  await page.goto(`/?room=startup-${Date.now()}&scene=${encodeURIComponent(
+    JSON.stringify({ elements: [RECTANGLE] }),
+  )}`);
+  await page.waitForFunction(() => document.querySelector("whiteboard-editor")?.api);
+  expect(await page.evaluate(() => document.querySelector("whiteboard-editor")
+    ?.api?.getAppState().viewModeEnabled)).toBe(true);
+  await expect(page.getByTestId("toolbar-rectangle")).toHaveCount(0);
+  release();
+  await expect(page.getByTestId("toolbar-rectangle")).toBeVisible();
+  expect(await page.evaluate(() => document.querySelector("whiteboard-editor")
+    ?.api?.getSceneElements())).toEqual([]);
+  await page.evaluate((element) => document.querySelector("whiteboard-editor")
+    ?.api?.updateScene({ elements: [element], captureUpdate: "IMMEDIATELY" }), RECTANGLE);
+  const peer = await page.context().newPage();
+  await peer.goto(`/?room=${new URL(page.url()).searchParams.get("room")}`);
+  await expect(peer.getByTestId("toolbar-rectangle")).toBeVisible();
+  await expect.poll(() => peer.evaluate(() => document.querySelector("whiteboard-editor")
+    ?.api?.getSceneElements().map(e => e.id))).toEqual([RECTANGLE.id]);
+});
+
+for (const readonly of [false, true]) {
+  for (const width of [390, 1280]) {
+    test(`canvas menu is hidden: readonly=${readonly}, width=${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/");
+      await page.waitForFunction(() => document.querySelector("whiteboard-editor")?.api);
+      if (readonly) {
+        await page.evaluate(() => {
+          const board = document.querySelector("whiteboard-editor")!;
+          const parent = board.parentElement!;
+          board.remove();
+          board.setAttribute("readonly", "");
+          parent.append(board);
+        });
+        await page.waitForFunction(() => document.querySelector("whiteboard-editor")?.api);
+      }
+      await expect(page.getByTestId("main-menu-trigger")).toBeHidden();
+      // A display:none button cannot enter the sequential keyboard focus order.
+      for (let step = 0; step < 12; step += 1) {
+        await page.keyboard.press("Tab");
+        await expect(page.getByTestId("main-menu-trigger")).not.toBeFocused();
+      }
+    });
+  }
+}

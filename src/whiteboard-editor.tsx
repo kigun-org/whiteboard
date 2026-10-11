@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { bindScene, elementsFromMap, type SceneElement } from "./binding";
 import {
   useHocuspocusSession,
+  type HocuspocusSession,
   type RealtimeConfig,
 } from "./collab/useHocuspocusSession";
 import "./whiteboard.css";
@@ -81,20 +82,42 @@ function Board({
 }) {
   const live = Boolean(roomId && realtime);
   const sessionState = useHocuspocusSession(live ? roomId : "", live ? realtime : null);
+  const session = sessionState.status === "ready" ? sessionState.session : null;
+  const viewMode = readonly || (live && (
+    sessionState.status !== "ready" || !session || !sessionState.writable
+  ));
+
+  return (
+    <BoardCanvas
+      key={session?.doc.guid ?? "preview"}
+      host={host}
+      elements={elements}
+      session={session}
+      live={live}
+      viewMode={viewMode}
+    />
+  );
+}
+
+// A new document gets a fresh canvas, including a fresh undo history.
+function BoardCanvas({ host, elements, session, live, viewMode }: {
+  host: WhiteboardEditorElement;
+  elements: SceneElement[];
+  session: HocuspocusSession | null;
+  live: boolean;
+  viewMode: boolean;
+}) {
   const [theme, setTheme] = useState(currentTheme);
   const [collaborators, setCollaborators] = useState(
     () => new Map<string, Collaborator>(),
   );
   const binding = useRef<ReturnType<typeof bindScene> | null>(null);
-  const boundDoc = useRef<object | null>(null);
-  const [apiReady, setApiReady] = useState(false);
+  const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const [bindingReady, setBindingReady] = useState(false);
   const lastScene = useRef<string | null>(null);
-
-  const session = sessionState.status === "ready" ? sessionState.session : null;
-  const serverWritable = sessionState.status === "ready" ? sessionState.writable : true;
-  // The host attribute is the local rule. The server scope replaces it once
-  // the room is open. A room that is still connecting does not hide the tools.
-  const viewMode = readonly || (sessionState.status === "ready" && !serverWritable);
+  const [initial] = useState(() =>
+    session ? elementsFromMap(session.doc.getMap("elements")) : elements,
+  );
 
   useEffect(() => {
     const observer = new MutationObserver(() => setTheme(currentTheme()));
@@ -115,11 +138,7 @@ function Board({
   }, [session]);
 
   useEffect(() => {
-    if (!apiReady || !session || !host.api) return;
-    if (boundDoc.current === session.doc) return;
-    binding.current?.destroy();
-    binding.current = null;
-    const api = host.api;
+    if (!api || !session) return;
     binding.current = bindScene(
       session.doc,
       {
@@ -129,38 +148,38 @@ function Board({
       },
       { writable: !viewMode },
     );
-    boundDoc.current = session.doc;
+    setBindingReady(true);
     return () => {
       binding.current?.destroy();
       binding.current = null;
-      boundDoc.current = null;
+      setBindingReady(false);
     };
-  }, [apiReady, session, viewMode, host]);
+  }, [api, session, viewMode]);
+
+  useEffect(() => () => {
+    if (host.api === api) host.api = null;
+  }, [api, host]);
 
   useEffect(() => {
-    if (!apiReady) return;
-    host.api?.updateScene({
+    if (!api) return;
+    api.updateScene({
       collaborators: collaborators as never,
       captureUpdate: CaptureUpdateAction.NEVER,
     });
-  }, [collaborators, apiReady, host]);
-
-  const initial = session
-    ? elementsFromMap(session.doc.getMap("elements"))
-    : elements;
+  }, [collaborators, api]);
 
   return (
     <div data-whiteboard-root="">
       <Excalidraw
         theme={theme}
         initialData={{ elements: initial as never }}
-        viewModeEnabled={viewMode}
+        viewModeEnabled={viewMode || (live && !bindingReady)}
         isCollaborating={Boolean(session)}
         UIOptions={UI_OPTIONS}
         validateEmbeddable={false}
         excalidrawAPI={(next: ExcalidrawImperativeAPI) => {
           host.api = next;
-          setApiReady(true);
+          setApi(next);
         }}
         onChange={(next, appState) => {
           if (!viewMode) {

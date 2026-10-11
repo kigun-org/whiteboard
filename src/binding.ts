@@ -89,9 +89,8 @@ export function bindScene(doc: Y.Doc, api: SceneApi, { writable = true } = {}) {
     applyRemote();
   };
 
-  // Keep strokes made before the room connected. A newer copy in the
-  // document wins.
-  write(api.getSceneElementsIncludingDeleted() as SceneElement[]);
+  // The synced document is authoritative when a binding starts. Canvas
+  // elements can belong to an old generation or stale page content.
   map.observe(observer);
   applyRemote();
 

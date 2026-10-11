@@ -84,6 +84,16 @@ export function useHocuspocusSession(
     let closed = false;
     let reloadTimer: ReturnType<typeof setTimeout> | undefined;
 
+    const reload = () => {
+      if (closed) return;
+      closed = true;
+      setState({ status: "reloading" });
+      reloadTimer = setTimeout(
+        () => setAttempt((value) => value + 1),
+        RELOAD_DELAY_MS,
+      );
+    };
+
     setState({ status: "connecting" });
     const provider = new HocuspocusProvider({
       websocketProvider: socketFor(url),
@@ -109,15 +119,15 @@ export function useHocuspocusSession(
       onAuthenticationFailed: ({ reason }) => {
         if (closed) return;
         if (RELOAD_REASONS.has(reason)) {
-          closed = true;
-          setState({ status: "reloading" });
-          reloadTimer = setTimeout(
-            () => setAttempt((value) => value + 1),
-            RELOAD_DELAY_MS,
-          );
+          reload();
         } else {
           setState({ status: "denied" });
         }
+      },
+      onClose: ({ event }) => {
+        // A room reset leaves the shared WebSocket open. Start a new room
+        // session rather than waiting for the socket to reconnect.
+        if (event.reason === "Reset Connection") reload();
       },
     });
     provider.attach();
