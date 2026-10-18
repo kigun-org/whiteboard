@@ -15,7 +15,7 @@
     "check": "tsc --noEmit && tsc -p tsconfig.node.json",
     "test": "pnpm build && playwright test"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
     "@hocuspocus/server": "4.7.0",
     "@playwright/test": "^1.63.0",
